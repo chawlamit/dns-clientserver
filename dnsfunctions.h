@@ -5,6 +5,7 @@ struct gethost_reply {
   char details[100];
 };
 typedef struct gethost_reply ghreply;
-ghreply ngethostbyname(unsigned char *, unsigned char *, int, int);
+//ghreply ngethostbyname(unsigned char *, unsigned char *, int, int);
+void ngethostbyname (unsigned char* , int);
 void ChangetoDnsNameFormat (unsigned char*,unsigned char*);
 unsigned char* ReadName (unsigned char*,unsigned char*,int*);

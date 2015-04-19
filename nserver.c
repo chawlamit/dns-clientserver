@@ -157,7 +157,7 @@ void handleDNSRequest(int sock) {
   ChangetoDnsNameFormat(qname , host);
   host[strlen(host)-1] = '\0';
   qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)];
-  qinfo->qtype = htons( T_A );
+  qinfo->qtype = htons( T_MX );
   qinfo->qclass = htons(1);
   writer = &buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
   replysize = sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION);
@@ -171,17 +171,18 @@ void handleDNSRequest(int sock) {
     dns->ans_count = htons(1);
   }
   else if(recursion_desired) {
-    hostdetails = ngethostbyname(host, ROOT_SERVER_IP, 1, 1);
+    //hostdetails = ngethostbyname(host, ROOT_SERVER_IP, 1, 1);
+    ngethostbyname(host,T_MX);
     host[strlen(host)-1] = '\0';
     while(hostdetails.type == 1) {
-      tmphd = ngethostbyname(hostdetails.details, DNS_SERVER, 1, 1);
+      //tmphd = ngethostbyname(hostdetails.details, DNS_SERVER, 1, 1);
       if(tmphd.type == -1) {
         // Not Found
         // Serious Error
         dns->rcode = 2;
       }
       else {
-        hostdetails = ngethostbyname(host, tmphd.details, 1, 1);
+        //hostdetails = ngethostbyname(host, tmphd.details, 1, 1);
         host[strlen(host)-1] = '\0';
       }
     }
