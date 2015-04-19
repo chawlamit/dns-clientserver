@@ -51,7 +51,7 @@ ghreply ngethostbyname(unsigned char *host,unsigned char *dns_server, int recurs
   //point to the query portion
   qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
   ChangetoDnsNameFormat(qname , host);
-  qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) 
+  qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER)
     + (strlen((const char*)qname) + 1)]; //fill it
 
   qinfo->qtype = htons( T_A ); // sending query of A record type
@@ -289,4 +289,3 @@ u_char* ReadName(unsigned char* reader,unsigned char* buffer,int* count)
   name[i-1]='\0'; //remove the last dot
   return name;
 }
-

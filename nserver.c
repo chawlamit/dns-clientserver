@@ -72,11 +72,6 @@ int main(int argc, char const *argv[])
       handleDNSRequest(sock);
     }
   }
-int z=0;
-for (z;z<100;z++)
-{
-printf("%s",hostcache[z]);
-}
 
 }
 char* checkCache(char * hostname) {
@@ -176,17 +171,17 @@ void handleDNSRequest(int sock) {
     dns->ans_count = htons(1);
   }
   else if(recursion_desired) {
-    hostdetails = ngethostbyname(host, ROOT_SERVER_IP, 1, 0);
+    hostdetails = ngethostbyname(host, ROOT_SERVER_IP, 1, 1);
     host[strlen(host)-1] = '\0';
     while(hostdetails.type == 1) {
-      tmphd = ngethostbyname(hostdetails.details, DNS_SERVER, 1, 0);
+      tmphd = ngethostbyname(hostdetails.details, DNS_SERVER, 1, 1);
       if(tmphd.type == -1) {
         // Not Found
         // Serious Error
         dns->rcode = 2;
       }
       else {
-        hostdetails = ngethostbyname(host, tmphd.details, 1, 0);
+        hostdetails = ngethostbyname(host, tmphd.details, 1, 1);
         host[strlen(host)-1] = '\0';
       }
     }
