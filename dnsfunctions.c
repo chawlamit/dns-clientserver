@@ -232,7 +232,7 @@
   return retval;
 }
 */
-void ngethostbyname(unsigned char *host , int query_type/*decides the resource record you want to retirve*/)
+unsigned char* ngethostbyname(unsigned char *host , int query_type/*decides the resource record you want to retirve*/)
 {
   unsigned char buf[65536],*qname,*reader;
   bzero(buf, sizeof(buf));
@@ -247,6 +247,10 @@ void ngethostbyname(unsigned char *host , int query_type/*decides the resource r
 
   struct DNS_HEADER *dns = NULL;
   struct QUESTION *qinfo = NULL;
+
+  fd_set rset;
+  struct timeval timeout;
+  timeout.tv_sec = 75;
 
   //printf("Resolving %s" , host);
 
@@ -291,6 +295,11 @@ void ngethostbyname(unsigned char *host , int query_type/*decides the resource r
     if(write(s, (char *)buf, sizeof(struct DNS_HEADER) + (strlen((const char *)qname)+1) + sizeof(struct QUESTION)) == 1)
       printf("write() failed");
       //printf("Done\n");
+
+//code for timeout;
+FD_ZERO(&rset);
+FD_SET(s,&rset);
+select(s+1,&rset,NULL,NULL,&timeout);
 
       //printf("Receiving answer...\n");
       if(read(s, (char *)buf, 65536) == 1)
@@ -478,7 +487,7 @@ void ngethostbyname(unsigned char *host , int query_type/*decides the resource r
               }
               printf("\n");
             }
-            return;
+            return buf;
           }
 
 void ChangetoDnsNameFormat(unsigned char* dns,unsigned char* host) {

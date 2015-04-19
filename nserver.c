@@ -7,6 +7,7 @@
 #include "dnsfunctions.h"
 
 //#define ROOT_SERVER_IP "198.41.0.4"
+// not required for new ngethostbyname
 #define ROOT_SERVER_IP "8.8.8.8"
 #define ROOT_SERVER "8.8.8.8"
 #define DNS_SERVER "8.8.4.4"
@@ -101,14 +102,20 @@ void handleDNSRequest(int sock) {
   unsigned char buf[65536],*qname, *writer, hname[20], *host;
   unsigned short reqid, qcount;
   unsigned int replysize = 0;
+  unsigned char* replybuf;  //reply from root dns
+  unsigned short q_type,q_class;
+
   struct DNS_HEADER *dns = NULL;
+  struct DNS_HEADER *dns1 = NULL;
   struct QUESTION *qinfo = NULL;
+
   struct RES_RECORD *answer,*auth;
   int stop = 0, recursion_desired;
   char *ip;
   lchar lc;
   ghreply hostdetails, tmphd;
   struct in_addr *addr;
+
 
   struct sockaddr_storage clntAddr;
   socklen_t clntAddrLen = sizeof(clntAddr);
@@ -129,8 +136,19 @@ void handleDNSRequest(int sock) {
   reqid = dns->id;
   qcount = ntohs(dns->q_count);
 
+  qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
+  ChangetoDnsNameFormat(qname , host);
+  host[strlen(host)-1] = '\0';
+  qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)];
+
+  writer = &buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
+  replysize = sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION);
+
+
+  q_type = qinfo->qtype;
+  q_class = qinfo->qclass;
   // preparing response
-  bzero(buf,sizeof(buf));
+//  bzero(buf,sizeof(buf));
   dns = (struct DNS_HEADER *)&buf;
   dns->id = reqid;
   dns->qr = 1;
@@ -147,21 +165,9 @@ void handleDNSRequest(int sock) {
   // 0 - NoError
   // 3 - NXDomain
   // 4 - NotImp
-
-  dns->q_count = htons(1);
-  dns->ans_count = htons(0);
-  dns->auth_count = htons(0);
-  dns->add_count = htons(0);
-
-  qname =(unsigned char*)&buf[sizeof(struct DNS_HEADER)];
-  ChangetoDnsNameFormat(qname , host);
-  host[strlen(host)-1] = '\0';
-  qinfo =(struct QUESTION*)&buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname) + 1)];
-  qinfo->qtype = htons( T_MX );
-  qinfo->qclass = htons(1);
-  writer = &buf[sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION)];
-  replysize = sizeof(struct DNS_HEADER) + (strlen((const char*)qname)+1) + sizeof(struct QUESTION);
-
+//  qinfo->qtype = q_type;
+//  qinfo->qclass = q_class;
+// Respond if there is a question to respond to
   if(qcount != 1) {
     dns->rcode = 4;
   }
@@ -169,38 +175,50 @@ void handleDNSRequest(int sock) {
     printf("Host %s found in cache.\n",host);
     dns->rcode = 0;   // NoError
     dns->ans_count = htons(1);
+    int y=0;
+    while (ip[y]!=0)
+    {
+      writer[y] = ip[y];
+      y++;
+    }
+    replybuf = buf;
+    //replysize += y+1;
   }
   else if(recursion_desired) {
     //hostdetails = ngethostbyname(host, ROOT_SERVER_IP, 1, 1);
-    ngethostbyname(host,T_MX);
+      replybuf = ngethostbyname(host, ntohs(q_type) );
+
+      hostdetails.details = host;
+      dns1 = (struct DNS_HEADER*) replybuf;
+      dns1->id = reqid;
+
     host[strlen(host)-1] = '\0';
-    while(hostdetails.type == 1) {
-      //tmphd = ngethostbyname(hostdetails.details, DNS_SERVER, 1, 1);
-      if(tmphd.type == -1) {
-        // Not Found
-        // Serious Error
-        dns->rcode = 2;
-      }
-      else {
-        //hostdetails = ngethostbyname(host, tmphd.details, 1, 1);
-        host[strlen(host)-1] = '\0';
-      }
-    }
+
     if(dns->rcode != 2) {
+
       if(hostdetails.type == -1) {
         printf("Host %s not found.\n",host);
         ip = NULL;
         dns->rcode = 3; // NXDomain
       }
+
       else {
         printf("Host %s found using root server.\n",host);
         ip = (char*)malloc(sizeof(char)*20);
-        strncpy(ip,hostdetails.details,20);
+          int z=0;
+          while (host[z]!='\0')
+          {
+          ip[z] = hostdetails.details[z];
+          z++;
+          }
       }
     }
   }
-  else {
-    // iterative
+
+  else {  // iterative
+
+    // preparing ans for iterative sever
+
     dns->rcode = 0;
     dns->ans_count = htons(0);
     dns->auth_count = htons(1);
@@ -226,15 +244,16 @@ void handleDNSRequest(int sock) {
     writer = writer + strlen(ROOT_SERVER);
     replysize += strlen(ROOT_SERVER);
   }
+
   if(ip != NULL) {
     // add to cache
     addToCache(host,ip);
 
-    dns->rcode = 0;
+    /*dns->rcode = 0;
     dns->ans_count = htons(1);
     dns->auth_count = htons(0);
     dns->add_count = htons(0);
-
+*/
     answer = (struct RES_RECORD*)malloc(sizeof(struct RES_RECORD));
     strcpy(writer,qname);
     writer = writer + strlen((const char*)qname)+1;
@@ -255,9 +274,11 @@ void handleDNSRequest(int sock) {
     writer[2] = lc.a[2];
     writer[3] = lc.a[3];
     writer = writer + 4;
-    replysize += 4;
+    replysize += 5;
+    printf("%d",replysize);
   }
-  if(sendto(sock,(char*)buf, replysize, 0, (struct sockaddr*)&clntAddr,clntAddrLen) < 0) {
+
+  if(sendto(sock,(char*)replybuf, replysize, 0, (struct sockaddr*)&clntAddr,clntAddrLen) < 0) {
     perror("sendto failed");
   }
 }

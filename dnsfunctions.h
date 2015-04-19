@@ -2,10 +2,10 @@
 
 struct gethost_reply {
   int type;             /* -1: Not found, 0: Found IP, 1: Found nameserver */
-  char details[100];
+  char *details;
 };
 typedef struct gethost_reply ghreply;
 //ghreply ngethostbyname(unsigned char *, unsigned char *, int, int);
-void ngethostbyname (unsigned char* , int);
+unsigned char* ngethostbyname (unsigned char* , int);
 void ChangetoDnsNameFormat (unsigned char*,unsigned char*);
 unsigned char* ReadName (unsigned char*,unsigned char*,int*);
